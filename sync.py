@@ -20,10 +20,8 @@ import sys
 import time
 
 # cluster specification
-parameter_servers = ["pc-01:2222"]
-workers = [	"pc-02:2222", 
-			"pc-03:2222",
-			"pc-04:2222"]
+parameter_servers = ["localhost:1234"]
+workers = [	"localhost:1235", "localhost:1236"]
 cluster = tf.train.ClusterSpec({"ps":parameter_servers, "worker":workers})
 
 # input flags
@@ -38,9 +36,9 @@ server = tf.train.Server(
     task_index=FLAGS.task_index)
 
 # config
-batch_size = 100
-learning_rate = 0.0005
-training_epochs = 20
+batch_size = 64
+learning_rate = 0.02
+training_epochs = 2
 logs_path = "/tmp/mnist/1"
 
 # load mnist data set
@@ -99,21 +97,15 @@ elif FLAGS.job_name == "worker":
 		with tf.name_scope('train'):
 			# optimizer is an "operation" which we can execute in a session
 			grad_op = tf.train.GradientDescentOptimizer(learning_rate)
-			'''
 			rep_op = tf.train.SyncReplicasOptimizer(
-                grad_op,
+			    grad_op,
 			    replicas_to_aggregate=len(workers),
- 				replica_id=FLAGS.task_index, 
- 			    total_num_replicas=len(workers),
- 				use_locking=True)
- 			train_op = rep_op.minimize(cross_entropy, global_step=global_step)
- 			'''
-			train_op = grad_op.minimize(cross_entropy, global_step=global_step)
+			    total_num_replicas=len(workers),
+				use_locking=True)
+			train_op = rep_op.minimize(cross_entropy, global_step=global_step)
 			
-		'''
 		init_token_op = rep_op.get_init_tokens_op()
 		chief_queue_runner = rep_op.get_chief_queue_runner()
-		'''
 
 		with tf.name_scope('Accuracy'):
 			# accuracy
@@ -129,54 +121,56 @@ elif FLAGS.job_name == "worker":
 		init_op = tf.global_variables_initializer()
 		print("Variables initialized ...")
 
+	if FLAGS.task_index==0:
+		local_init_op = rep_op.chief_init_op
+	else:
+		local_init_op = rep_op.local_step_init_op
+
 	sv = tf.train.Supervisor(is_chief=(FLAGS.task_index == 0),
-														global_step=global_step,
-														init_op=init_op)
+		 recovery_wait_secs=1,
+		 global_step=global_step,
+		 local_init_op = local_init_op,
+		 ready_for_local_init_op = rep_op.ready_for_local_init_op,
+		 init_op=init_op)
 
-	begin_time = time.time()
 	frequency = 100
-	with sv.prepare_or_wait_for_session(server.target) as sess:
-		'''
-		# is chief
-		if FLAGS.task_index == 0:
-			sv.start_queue_runners(sess, [chief_queue_runner])
-			sess.run(init_token_op)
-		'''
-		# create log writer object (this will log on every machine)
-		writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
-				
-		# perform training cycles
-		start_time = time.time()
-		for epoch in range(training_epochs):
+	sess = sv.prepare_or_wait_for_session(server.target)
+	# is chief
+	if FLAGS.task_index == 0:
+		sv.start_queue_runners(sess, [chief_queue_runner])
+		sess.run(init_token_op)
+	
+	# create log writer object (this will log on every machine)
+	writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
+	start_time = time.time()				
+	# perform training cycles
+	training_time = 0
+	for epoch in range(training_epochs):
+		print("Epoch", epoch)
+		# number of batches in one epoch
+		batch_count = int(mnist.train.num_examples/batch_size)
+		epoch_start_time = time.time()
+		for i in range(batch_count):
+			print("Epoch", epoch, "batch", i)
+			batch_x, batch_y = mnist.train.next_batch(batch_size)
+			# perform the operations we defined earlier on batch
+			_, cost, summary, step = sess.run(
+				[train_op, cross_entropy, summary_op, global_step], 
+				feed_dict={x: batch_x, y_: batch_y})
+			writer.add_summary(summary, step)
 
-			# number of batches in one epoch
-			batch_count = int(mnist.train.num_examples/batch_size)
+		training_time += time.time() - epoch_start_time	
+		print("done training")
 
-			count = 0
-			for i in range(batch_count):
-				batch_x, batch_y = mnist.train.next_batch(batch_size)
-				
-				# perform the operations we defined earlier on batch
-				_, cost, summary, step = sess.run(
-												[train_op, cross_entropy, summary_op, global_step], 
-												feed_dict={x: batch_x, y_: batch_y})
-				writer.add_summary(summary, step)
+	total_time = time.time() - start_time
+	wait_time = total_time - training_time
+	print("Total Time: %3.2fs" % total_time)
+	print("Training Time: %3.2fs" % float(training_time))
+	print("Wait TIme: %3.2fs" % wait_time)
+	test_start_time = time.time()
+	print("Test-Accuracy: %2.2f" % sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels}))
+	print("Training-Accuracy: %2.2f" % sess.run(accuracy, feed_dict={x: mnist.train.images, y_: mnist.train.labels}))
 
-				count += 1
-				if count % frequency == 0 or i+1 == batch_count:
-					elapsed_time = time.time() - start_time
-					start_time = time.time()
-					print("Step: %d," % (step+1), 
-								" Epoch: %2d," % (epoch+1), 
-								" Batch: %3d of %3d," % (i+1, batch_count), 
-								" Cost: %.4f," % cost, 
-								" AvgTime: %3.2fms" % float(elapsed_time*1000/frequency))
-					count = 0
-
-
-		print("Test-Accuracy: %2.2f" % sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels}))
-		print("Total Time: %3.2fs" % float(time.time() - begin_time))
-		print("Final Cost: %.4f" % cost)
-
-	sv.stop()
+	time.sleep(5)
+	#sv.request_stop()
 	print("done")
