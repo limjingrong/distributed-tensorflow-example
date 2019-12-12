@@ -1,0 +1,29 @@
+2019-12-11 15:13:29.166258: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: SSE4.1 SSE4.2 AVX
+WARNING:tensorflow:
+The TensorFlow contrib module will not be included in TensorFlow 2.0.
+For more information, please see:
+  * https://github.com/tensorflow/community/blob/master/rfcs/20180907-contrib-sunset.md
+  * https://github.com/tensorflow/addons
+  * https://github.com/tensorflow/io (for I/O related ops)
+If you depend on functionality not listed there, please file an issue.
+
+WARNING:tensorflow:
+The TensorFlow contrib module will not be included in TensorFlow 2.0.
+For more information, please see:
+  * https://github.com/tensorflow/community/blob/master/rfcs/20180907-contrib-sunset.md
+  * https://github.com/tensorflow/addons
+  * https://github.com/tensorflow/io (for I/O related ops)
+If you depend on functionality not listed there, please file an issue.
+
+Traceback (most recent call last):
+  File "worker.py", line 113, in <module>
+    estimator.train(input_fn=input_fn)
+  File "/home/rdma_for_ml/.local/lib/python3.5/site-packages/tensorflow_estimator/python/estimator/estimator.py", line 370, in train
+    loss = self._train_model(input_fn, hooks, saving_listeners)
+  File "/home/rdma_for_ml/.local/lib/python3.5/site-packages/tensorflow_estimator/python/estimator/estimator.py", line 1159, in _train_model
+    return self._train_model_distributed(input_fn, hooks, saving_listeners)
+  File "/home/rdma_for_ml/.local/lib/python3.5/site-packages/tensorflow_estimator/python/estimator/estimator.py", line 1217, in _train_model_distributed
+    hooks)
+  File "/home/rdma_for_ml/.local/lib/python3.5/site-packages/tensorflow_core/python/distribute/estimator_training.py", line 310, in estimator_train
+    raise ValueError('Only `STANDALONE_CLIENT` mode is supported when you call '
+ValueError: Only `STANDALONE_CLIENT` mode is supported when you call `estimator.train`
