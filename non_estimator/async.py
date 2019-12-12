@@ -20,8 +20,23 @@ import sys
 import time
 
 # cluster specification
-parameter_servers = ["localhost:1234"]
-workers = [	"localhost:1235", "localhost:1236"]
+parameter_servers = ["192.168.9.20:1234"]
+workers = ["192.168.9.16:1234",
+           "192.168.9.17:1234",
+           "192.168.9.18:1234",
+           "192.168.9.23:1234",
+           "192.168.9.24:1234",
+           "192.168.9.25:1234",
+           "192.168.9.26:1234",
+           "192.168.9.27:1234",
+           "192.168.9.28:1234",
+           "192.168.9.29:1234",
+           "192.168.9.30:1234",
+           "192.168.9.31:1234",
+           "192.168.9.32:1234",
+           "192.168.9.105:1234",
+           "192.168.9.106:1234",
+           ]
 cluster = tf.train.ClusterSpec({"ps":parameter_servers, "worker":workers})
 
 # input flags
@@ -36,7 +51,7 @@ server = tf.train.Server(
     task_index=FLAGS.task_index)
 
 # config
-batch_size = 64
+batch_size = 60
 learning_rate = 0.02
 training_epochs = 20
 logs_path = "/tmp/mnist/1"
@@ -166,7 +181,7 @@ elif FLAGS.job_name == "worker":
 	wait_time = total_time - training_time
 	print("Total Time: %3.2fs" % total_time)
 	print("Training Time: %3.2fs" % float(training_time))
-	print("Wait TIme: %3.2fs" % wait_time)
+	print("Wait Time: %3.2fs" % wait_time)
 	test_start_time = time.time()
 	print("Test-Accuracy: %2.2f" % sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels}))
 	print("Training-Accuracy: %2.2f" % sess.run(accuracy, feed_dict={x: mnist.train.images, y_: mnist.train.labels}))
