@@ -53,10 +53,23 @@ server = tf.train.Server(
 # config
 batch_size = 60
 learning_rate = 0.02
-training_epochs = 20
+training_epochs = 1
 logs_path = "/tmp/mnist/1"
 
+"""
 # load mnist data set
+import tensorflow_datasets as tfds
+
+tf.random.set_random_seed(1234)
+start = int(100 * FLAGS.task_index / len(workers))
+end = int(100 * (FLAGS.task_index + 1) / len(workers))
+train_str = 'train[{}%:{}%]'.format(start,end)
+print(train_str)
+
+mnist_train = tfds.load(name="mnist:3.*.*", split=train_str, shuffle_files=True).batch(batch_size)
+mnist_test = tfds.load(name="mnist:3.*.*", split="test")
+#print(mnist_train.num_examples)
+"""
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
@@ -143,8 +156,8 @@ elif FLAGS.job_name == "worker":
 		print("Variables initialized ...")
 
 	sv = tf.train.Supervisor(is_chief=(FLAGS.task_index == 0),
-														global_step=global_step,
-														init_op=init_op)
+				 global_step=global_step,
+				 init_op=init_op)
 
 	frequency = 100
 	sess = sv.prepare_or_wait_for_session(server.target)
@@ -163,16 +176,17 @@ elif FLAGS.job_name == "worker":
 	for epoch in range(training_epochs):
 		print("Epoch", epoch)
 		# number of batches in one epoch
-		batch_count = int(mnist.train.num_examples/batch_size)
+		batch_count = int(mnist_train.num_examples/batch_size)
 		epoch_start_time = time.time()
 		for i in range(batch_count):
-			batch_x, batch_y = mnist.train.next_batch(batch_size)
-			
-			# perform the operations we defined earlier on batch
-			_, cost, summary, step = sess.run(
-				[train_op, cross_entropy, summary_op, global_step], 
-				feed_dict={x: batch_x, y_: batch_y})
-			writer.add_summary(summary, step)
+			if (i%len(workers)) == FLAGS.task_index:
+				batch_x, batch_y = mnist_train.next_batch(batch_size)
+				
+				# perform the operations we defined earlier on batch
+				_, cost, summary, step = sess.run(
+					[train_op, cross_entropy, summary_op, global_step], 
+					feed_dict={x: batch_x, y_: batch_y})
+				writer.add_summary(summary, step)
 
 		training_time += time.time() - epoch_start_time	
 		print("done training")
@@ -183,9 +197,9 @@ elif FLAGS.job_name == "worker":
 	print("Training Time: %3.2fs" % float(training_time))
 	print("Wait Time: %3.2fs" % wait_time)
 	test_start_time = time.time()
-	print("Test-Accuracy: %2.2f" % sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels}))
-	print("Training-Accuracy: %2.2f" % sess.run(accuracy, feed_dict={x: mnist.train.images, y_: mnist.train.labels}))
+	print("Test-Accuracy: %4.4f" % sess.run(accuracy, feed_dict={x: mnist_test.images, y_: mnist_test.labels}))
+	print("Training-Accuracy: %4.4f" % sess.run(accuracy, feed_dict={x: mnist_train.images, y_: mnist_train.labels}))
 
-	time.sleep(5)
+	server.join()
 	sv.stop()
 	print("done")
