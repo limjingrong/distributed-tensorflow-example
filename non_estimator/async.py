@@ -52,7 +52,7 @@ server = tf.train.Server(
 
 # config
 batch_size = 60
-learning_rate = 0.02
+learning_rate = 0.1
 training_epochs = 1
 logs_path = "/tmp/mnist/1"
 
@@ -66,9 +66,9 @@ end = int(100 * (FLAGS.task_index + 1) / len(workers))
 train_str = 'train[{}%:{}%]'.format(start,end)
 print(train_str)
 
-mnist_train = tfds.load(name="mnist:3.*.*", split=train_str, shuffle_files=True).batch(batch_size)
-mnist_test = tfds.load(name="mnist:3.*.*", split="test")
-#print(mnist_train.num_examples)
+mnist.train = tfds.load(name="mnist:3.*.*", split=train_str, shuffle_files=True).batch(batch_size)
+mnist.test = tfds.load(name="mnist:3.*.*", split="test")
+#print(mnist.train.num_examples)
 """
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
@@ -120,6 +120,8 @@ elif FLAGS.job_name == "worker":
 			# this is our cost
 			cross_entropy = tf.reduce_mean(
                 -tf.reduce_sum(y_ * tf.log(y), reduction_indices=[1]))
+			regularizers = tf.nn.l2_loss(W1) + tf.nn.l2_loss(W2)
+			cross_entropy = tf.reduce_mean(cross_entropy + 0.0001*regularizers)
 
 		# specify optimizer
 		with tf.name_scope('train'):
@@ -176,11 +178,11 @@ elif FLAGS.job_name == "worker":
 	for epoch in range(training_epochs):
 		print("Epoch", epoch)
 		# number of batches in one epoch
-		batch_count = int(mnist_train.num_examples/batch_size)
+		batch_count = int(mnist.train.num_examples/batch_size)
 		epoch_start_time = time.time()
 		for i in range(batch_count):
 			if (i%len(workers)) == FLAGS.task_index:
-				batch_x, batch_y = mnist_train.next_batch(batch_size)
+				batch_x, batch_y = mnist.train.next_batch(batch_size)
 				
 				# perform the operations we defined earlier on batch
 				_, cost, summary, step = sess.run(
@@ -197,8 +199,8 @@ elif FLAGS.job_name == "worker":
 	print("Training Time: %3.2fs" % float(training_time))
 	print("Wait Time: %3.2fs" % wait_time)
 	test_start_time = time.time()
-	print("Test-Accuracy: %4.4f" % sess.run(accuracy, feed_dict={x: mnist_test.images, y_: mnist_test.labels}))
-	print("Training-Accuracy: %4.4f" % sess.run(accuracy, feed_dict={x: mnist_train.images, y_: mnist_train.labels}))
+	print("Test-Accuracy: %4.4f" % sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels}))
+	print("Training-Accuracy: %4.4f" % sess.run(accuracy, feed_dict={x: mnist.train.images, y_: mnist.train.labels}))
 
 	server.join()
 	sv.stop()
