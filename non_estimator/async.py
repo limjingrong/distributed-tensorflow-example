@@ -53,7 +53,7 @@ server = tf.train.Server(
 # config
 batch_size = 60
 learning_rate = 0.1
-training_epochs = 1
+training_epochs = 8
 logs_path = "/tmp/mnist/1"
 
 """
@@ -99,28 +99,29 @@ elif FLAGS.job_name == "worker":
 		# model parameters will change during training so we use tf.Variable
 		tf.set_random_seed(1)
 		with tf.name_scope("weights"):
-			W1 = tf.Variable(tf.random_normal([784, 100]))
-			W2 = tf.Variable(tf.random_normal([100, 10]))
+			W1 = tf.Variable(tf.random_normal([784, 10]))
+			# W2 = tf.Variable(tf.random_normal([100, 10]))
 
 		# bias
 		with tf.name_scope("biases"):
-			b1 = tf.Variable(tf.zeros([100]))
-			b2 = tf.Variable(tf.zeros([10]))
+			b1 = tf.Variable(tf.zeros([10]))
+			# b2 = tf.Variable(tf.zeros([10]))
 
 		# implement model
 		with tf.name_scope("softmax"):
 			# y is our prediction
 			z2 = tf.add(tf.matmul(x,W1),b1)
-			a2 = tf.nn.sigmoid(z2)
-			z3 = tf.add(tf.matmul(a2,W2),b2)
-			y  = tf.nn.softmax(z3)
+			#a2 = tf.nn.sigmoid(z2)
+			#z3 = tf.add(tf.matmul(a2,W2),b2)
+			y  = tf.nn.softmax(z2)
 
 		# specify cost function
 		with tf.name_scope('cross_entropy'):
 			# this is our cost
 			cross_entropy = tf.reduce_mean(
                 -tf.reduce_sum(y_ * tf.log(y), reduction_indices=[1]))
-			regularizers = tf.nn.l2_loss(W1) + tf.nn.l2_loss(W2)
+			regularizers = tf.nn.l2_loss(W1) # + tf.nn.l2_loss(W2)
+			print(regularizers)
 			cross_entropy = tf.reduce_mean(cross_entropy + 0.0001*regularizers)
 
 		# specify optimizer
@@ -131,11 +132,11 @@ elif FLAGS.job_name == "worker":
 			rep_op = tf.train.SyncReplicasOptimizer(
                 grad_op,
 			    replicas_to_aggregate=len(workers),
- 				replica_id=FLAGS.task_index, 
- 			    total_num_replicas=len(workers),
- 				use_locking=True)
- 			train_op = rep_op.minimize(cross_entropy, global_step=global_step)
- 			'''
+				replica_id=FLAGS.task_index, 
+			    total_num_replicas=len(workers),
+				use_locking=True)
+			train_op = rep_op.minimize(cross_entropy, global_step=global_step)
+			'''
 			train_op = grad_op.minimize(cross_entropy, global_step=global_step)
 			
 		'''
